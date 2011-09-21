@@ -24,38 +24,45 @@ class Mle_Gui(object):
         """
         #APPS VARS
         self.library = []
-        
+        self.state = "init"
         #WINDOW INIT
-        self.window = Tk()
-        self.window.title("Music Library Enhancer")
-        self.window.rowconfigure(0, weight=1)
-        self.window.columnconfigure(0, weight=1)      
-        #BUTTONS INIT
-        self.scanButton = Button(self.window,text = "Scan Library", command = self.start_scan)
-        
-        #LABELS INIT
-        self.errorLabel = Label(self.window)
-        
-        #LISTS INIT
+        self.window = Tk()    
+       #LISTS INIT
         self.resultListScrollBar = Scrollbar(self.window)
         self.resultList = Listbox(self.window, yscrollcommand=self.resultListScrollBar.set,width=50,height=5)
         self.resultListScrollBar.config(command=self.resultList.yview)
-        
         #MENU INIT
         self.main_menu = Menu(self.window)
-        
-        self.filemenu = Menu(self.main_menu,tearoff = 0)
-        self.filemenu.add_command(label="Quit!", command= quit)
-        self.library_menu = Menu(self.main_menu,tearoff = 0)
-        self.library_menu.add_command(label="Select library directory",command = self.req_directory)
-        
-        
-        self.main_menu.add_cascade(label ="File",menu = self.filemenu)
-        self.main_menu.add_cascade(label ="Library",menu = self.library_menu)
-        self.window.configure(menu = self.main_menu,width = 100,height= 50)
-        
         self.progressMeter = Meter(self.window)
-
+        
+        self.change_state()
+        
+    def change_state(self):
+        if self.state == "init":
+            self.window.title("Music Library Enhancer")
+            self.window.rowconfigure(0, weight=1)
+            self.window.columnconfigure(0, weight=1)     
+            #Menu
+            self.filemenu = Menu(self.main_menu,tearoff = 0)
+            self.filemenu.add_command(label="Quit!", command= quit)
+            self.library_menu = Menu(self.main_menu,tearoff = 0)
+            self.library_menu.add_command(label="Scan library directory",command = self.req_directory)
+            self.main_menu.add_cascade(label ="File",menu = self.filemenu)
+            self.main_menu.add_cascade(label ="Library",menu = self.library_menu)
+            self.window.configure(menu = self.main_menu,width = 100,height= 50)
+        elif self.state == "scan":
+            self.window.title("Music Library Enhancer - "+ str(self.libDir))
+            self.resultList.delete(0,END)
+            self.progressMeter.grid(row=1,column=0)
+            if self.library_menu.index(1) == 1:
+                self.library_menu.delete(1,END)
+            self.library_menu.add_command(label ="Check for duplicates", command = self.check_duplicates)
+        elif self.state == "check_duplicates":
+            self.resultList.delete(0,END)
+            self.resultList.config(width=100)
+            self.progressMeter.grid(row=1,column=0,sticky=E+W)
+            self.library_menu.delete(1,END)
+            
     def req_directory(self):
         """
         Retrieve folder path argument
@@ -69,48 +76,46 @@ class Mle_Gui(object):
         """
         Scan folder for music files and tags associated
         """
-        #Re-init GUI
-        self.errorLabel.config(text = "")
-        self.resultList.delete(0,END)
-        self.progressMeter.grid(row=1,column=0)
+        self.state = "scan"
+        self.change_state()
+        
         if self.libDir != "":
             # try:
             self.library =  Utils.scanDirectory(Utils,self.libDir,self.progressMeter)
             if len(self.library) == 0:
                 self.resultList.insert(END,"No supported audio files in this directory.")
                 self.resultList.config(width=50,height=5)
-                self.progressMeter.grid_remove()
             else:
-                for item in self.library:
-                    self.resultListScrollBar.grid(row=0,column=1,sticky=N+S+W)
-                    self.resultList.config(height=40,width=80,selectmode="multiple")
-                    self.resultList.insert(END,str(self.library.index(item))+"."+item["sys_info"][0]+"\\"+ item["sys_info"][1])
-            #  except:
-            #     self.errorLabel.config(text = "Library scanning error !")
-            #     self.errorLabel.grid(row=100,column=1)
+                self.resultListScrollBar.grid(row=0,column=1,sticky=N+S+W)
+                self.scan_report()
+                if len(self.library) < 1000:
+                    for item in self.library:
+                        self.resultList.config(height=40,width=80,selectmode="multiple")
+                        self.resultList.insert(END,str(self.library.index(item))+"."+item["sys_info"][0]+"\\"+ item["sys_info"][1])
         else:
-            self.errorLabel.config(text = "No directory entered :[" +str(self.libDir)+"]")
-            self.errorLabel.grid(row=100,column=1)
-        self.window.title(self.window.title()+" - "+ str(self.libDir))
-        self.library_menu.add_command(label ="Check for duplicates", command = self.checkDuplicates)
+            print "error"
         self.progressMeter.grid_remove()
         
+    def scan_report(self):
+        library_size = len(self.library)
+        tagged_files = library_size
+        for file in self.library:
+            if isinstance(file["tags_info"],str):
+                tagged_files = tagged_files - 1
+        self.resultList.insert(END,"Scanning "+self.libDir+" finished.")
+        self.resultList.insert(END,"Found "+str(library_size)+" audio files.")
+        self.resultList.insert(END,str(tagged_files) + " having a tag.")
+        self.resultList.insert(END,"")
     def check_duplicates(self):
         """
         Handler for launching a duplicate files scanning in the library and retrieving the result
         """
-        #Re-init GUI
-        self.resultList.delete(0,END)
-        self.resultList.config(width=100)
-        self.resultList.insert(END,"Looking for duplicates elements into your library...")
-        self.resultList.grid_remove
-        self.progressMeter.grid(row=1,column=0,sticky=E+W)
+        self.state = "check_duplicates"
+        self.change_state()
+    
         duplicates_indexes = filename.compare(self.library,self.progressMeter)
-        
-        
         #Display the result
-        self.resultList.delete(0,END)
-        self.resultList.insert(END,"--- Files with same filenames detected: ---")
+        self.resultList.insert(END,"--- Duplicates by filename detected: ---")
         for index in duplicates_indexes:
             if isinstance(index, int):
                 self.resultList.insert(END,str(index)+" "+self.library[index]["sys_info"][1]+" found in ("+self.library[index]["sys_info"][0]+")")
@@ -119,7 +124,7 @@ class Mle_Gui(object):
         self.resultList.insert(END,"")
         
         duplicates_tags_indexes = filename.compare_tags(self.library,self.progressMeter)
-        
+        #Display the result
         self.resultList.insert(END,"--- Files with same tags detected: ---")
         self.resultList.insert(END,"")
         marker = 1
@@ -134,8 +139,9 @@ class Mle_Gui(object):
                 self.resultList.insert(END,"")
         
         if len(duplicates_indexes) + len(duplicates_tags_indexes) > 0:
-            self.library_menu.add_command(label="Delete selected duplicates",command = self.deleteDuplicates)
-     
+            self.library_menu.add_command(label="Delete selected duplicates",command = self.delete_duplicates)
+        self.progressMeter.grid_remove()
+        
     def delete_duplicates(self):
         try:
             entries = self.resultList.selection_get().split('\n')
@@ -152,7 +158,8 @@ class Mle_Gui(object):
                 if tkMessageBox.askokcancel("Confirmation",
                                             "Delete the "+str(len(indexes))+
                                             " selected files?"):
-                   tkMessageBox.showinfo("Delete files", str(Utils.deleteFiles(self.library,indexes)) + " file(s) successfully deleted.")
+                    tkMessageBox.showinfo("Delete files", str(Utils.deleteFiles(self.library,indexes)) + " file(s) successfully deleted. Will now re-scan library")
+                    self.start_scan()
             else:
                 raise EXCEPTION
                 
@@ -161,6 +168,7 @@ class Mle_Gui(object):
             
 
     
+             
     def main_window(self):
         """
         Main window initialisation, populating window

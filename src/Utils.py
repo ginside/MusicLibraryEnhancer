@@ -7,7 +7,8 @@ Created on 29 mars 2011
 import os,duplicate_finder,re,Tkinter
 from duplicate_finder import filename
 from mutagen import easyid3
-
+from mutagen import flac
+from mutagen.flac import FLAC
 
 AUDIO_EXTENSIONS = ["mp3","wav","flac","wma","aac","aif"]
 PLAYLIST_EXTENSIONS = ["m3u","pls"]
@@ -44,7 +45,17 @@ def tag_reader(file):
             tag = easyid3.EasyID3(file_path)
             return tag
         except:
-            print "tag reading error/ no tag/empty tag for file "+file_path
+            return "None"
+            # print "tag reading error/ no tag/empty tag for file "+file_path
+    elif file[2] == "flac":
+        try:
+            flac_file = FLAC.load(file_path)
+            flac_file.tags # ??
+        
+            # ?????
+            return "None"
+        except:
+            return "None"
     else:
         print file[2]+" filetype has no tag format processed."
         
